@@ -1,0 +1,6 @@
+{
+  "name": "비밀의 자리 배치",
+  "description": "대한민국 선생님들을 위한 비밀 제약 조건이 있는 스마트 교실 자리 배치 웹 애플리케이션 (Class Seat Planner with Secret Constraints)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
