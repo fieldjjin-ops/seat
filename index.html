@@ -1,13 +1,452 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>비밀의 자리 배치 - 교사용 스마트 자리 배치표</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트 교실 자리 배치표</title>
+    <style>
+        /* [디자인 설정] 깔끔하고 모던한 화이트 & 라이트 블루 톤 */
+        :root {
+            --primary: #4A90E2;
+            --primary-light: #E1EDF9;
+            --text-dark: #333333;
+            --bg-color: #F8F9FA;
+            --desk-bg: #FFFFFF;
+            --desk-border: #BBD2EA;
+        }
 
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* 컨트롤 패널 (버튼, 입력창 등) */
+        .controls-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            width: 90%;
+            max-width: 800px;
+            margin-bottom: 20px;
+            z-index: 10;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        /* 시크릿 모드 진입점: 제목 더블클릭 */
+        h1 { color: var(--primary); margin: 0; cursor: pointer; user-select: none; }
+        
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            margin-left: 5px;
+        }
+        .btn:hover { background-color: #357ABD; }
+        .btn-green { background-color: #2ECC71; }
+        .btn-green:hover { background-color: #27AE60; }
+
+        .settings-row {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .student-input {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        textarea {
+            width: 100%;
+            height: 80px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 10px;
+            resize: none;
+            box-sizing: border-box;
+        }
+
+        .grid-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+        }
+        .slider-group label { font-weight: bold; font-size: 14px; display: block; }
+        input[type=range] { width: 100%; }
+
+        /* 칠판 영역 */
+        .blackboard {
+            background-color: #2C3E50;
+            color: white;
+            width: 60%;
+            max-width: 400px;
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            border: 4px solid #BDC3C7;
+            font-weight: bold;
+            margin-bottom: 20px;
+            transition: transform 0.8s ease;
+        }
+
+        /* 자리 배치도 영역 (회전 애니메이션 포함) */
+        .classroom-container {
+            width: 90%;
+            max-width: 900px;
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            transform-origin: center center;
+        }
+
+        .seating-grid {
+            display: grid;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .desk {
+            background-color: var(--desk-bg);
+            border: 2px solid var(--desk-border);
+            border-radius: 10px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            position: relative;
+        }
+        .desk .seat-num {
+            position: absolute;
+            top: 2px; left: 5px;
+            font-size: 0.6em; color: #999;
+        }
+
+        /* 회전 클래스 */
+        .rotated { transform: rotate(180deg); }
+        .rotated .desk { transform: rotate(180deg); } /* 책상 안의 글자는 똑바로 보이게 재회전 */
+
+        /* 시크릿 모드 모달 (숨겨진 창) */
+        #secretModal {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            border: 3px solid var(--primary);
+            width: 80%; max-width: 500px;
+        }
+        .modal-bg {
+            display: none;
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 컨트롤 패널 -->
+    <div class="controls-panel">
+        <div class="header">
+            <!-- 제목 더블클릭 시 시크릿 모드 작동 -->
+            <h1 ondblclick="openSecretMode()" title="더블클릭해보세요!">스마트 자리 배치표</h1>
+            <div>
+                <button class="btn" onclick="toggleView()" id="viewBtn">👁️ 교탁용 보기로 전환</button>
+                <button class="btn btn-green" onclick="downloadHWP()">💾 HWP 다운로드</button>
+            </div>
+        </div>
+
+        <div class="settings-row">
+            <div class="student-input">
+                <label style="font-weight: bold; margin-bottom: 5px;">학생 명단 (띄어쓰기나 줄바꿈으로 구분)</label>
+                <textarea id="studentNames" placeholder="예: 홍길동 김철수 이영희..." onchange="saveData()"></textarea>
+            </div>
+            
+            <div class="grid-controls">
+                <div class="slider-group">
+                    <label>행 (줄 수): <span id="rowVal">5</span></label>
+                    <input type="range" id="rows" min="2" max="10" value="5" oninput="updateGridSettings()">
+                </div>
+                <div class="slider-group">
+                    <label>열 (칸 수): <span id="colVal">5</span></label>
+                    <input type="range" id="cols" min="2" max="10" value="5" oninput="updateGridSettings()">
+                </div>
+                <button class="btn" style="width: 100%; padding: 15px; font-size: 1.1em; background-color: #E74C3C;" onclick="startShuffle()">🎲 자리 뽑기 (3초)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 칠판 -->
+    <div class="blackboard" id="board">칠 판 (앞)</div>
+
+    <!-- 교실 자리 영역 -->
+    <div class="classroom-container" id="classroom">
+        <div class="seating-grid" id="grid">
+            <!-- 자바스크립트로 책상이 생성됩니다 -->
+        </div>
+    </div>
+
+    <!-- 시크릿 모드 창 (비밀) -->
+    <div class="modal-bg" id="modalBg" onclick="closeSecretMode()"></div>
+    <div id="secretModal">
+        <h2 style="color: #E74C3C; margin-top: 0;">🕵️ 시크릿 모드 (교사용)</h2>
+        <p style="font-size: 0.9em; color: #666;">학생들에게는 비밀입니다.</p>
+        
+        <label><b>1. 지정석 (특정 번호 자리에 고정)</b></label>
+        <textarea id="fixedSeats" placeholder="예: 1번자리에 홍길동 -> 1:홍길동, 5:김철수" style="height: 50px; margin-bottom:15px;"></textarea>
+
+        <label><b>2. 따로 앉기 (앞/뒤/옆 짝꿍 금지)</b></label>
+        <textarea id="separated" placeholder="예: 홍길동-김철수, 이영희-박민수" style="height: 50px; margin-bottom:15px;"></textarea>
+        
+        <div style="text-align: right;">
+            <button class="btn" onclick="saveSecretData()">저장하고 닫기</button>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수
+        let isTeacherView = false;
+        let isShuffling = false;
+
+        // 1. 초기 데이터 로드 (localStorage)
+        window.onload = function() {
+            if(localStorage.getItem('studentList')) document.getElementById('studentNames').value = localStorage.getItem('studentList');
+            if(localStorage.getItem('rows')) document.getElementById('rows').value = localStorage.getItem('rows');
+            if(localStorage.getItem('cols')) document.getElementById('cols').value = localStorage.getItem('cols');
+            if(localStorage.getItem('fixedSeats')) document.getElementById('fixedSeats').value = localStorage.getItem('fixedSeats');
+            if(localStorage.getItem('separated')) document.getElementById('separated').value = localStorage.getItem('separated');
+            
+            updateGridSettings();
+        };
+
+        // 데이터 자동 저장
+        function saveData() {
+            localStorage.setItem('studentList', document.getElementById('studentNames').value);
+        }
+
+        // 스크롤/슬라이더 행열 조절
+        function updateGridSettings() {
+            const rows = document.getElementById('rows').value;
+            const cols = document.getElementById('cols').value;
+            document.getElementById('rowVal').innerText = rows;
+            document.getElementById('colVal').innerText = cols;
+            
+            localStorage.setItem('rows', rows);
+            localStorage.setItem('cols', cols);
+            
+            drawEmptyGrid(rows, cols);
+        }
+
+        // 빈 책상 그리기
+        function drawEmptyGrid(rows, cols) {
+            const grid = document.getElementById('grid');
+            grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            grid.innerHTML = '';
+            
+            for(let i = 0; i < rows * cols; i++) {
+                grid.innerHTML += `<div class="desk" id="desk-${i}"><span class="seat-num">${i+1}</span><span class="name-tag">-</span></div>`;
+            }
+        }
+
+        // 화면 회전 (교탁용 / 게시용)
+        function toggleView() {
+            const classroom = document.getElementById('classroom');
+            const board = document.getElementById('board');
+            const btn = document.getElementById('viewBtn');
+            
+            isTeacherView = !isTeacherView;
+            
+            if(isTeacherView) {
+                classroom.classList.add('rotated');
+                board.style.transform = 'translateY(100px)'; // 칠판 시각적 효과
+                btn.innerText = "👀 게시용(학생용) 보기로 전환";
+                btn.style.backgroundColor = "#F39C12";
+            } else {
+                classroom.classList.remove('rotated');
+                board.style.transform = 'translateY(0)';
+                btn.innerText = "👁️ 교탁용 보기로 전환";
+                btn.style.backgroundColor = "var(--primary)";
+            }
+        }
+
+        // 시크릿 모드 로직
+        function openSecretMode() {
+            document.getElementById('secretModal').style.display = 'block';
+            document.getElementById('modalBg').style.display = 'block';
+        }
+        function closeSecretMode() {
+            document.getElementById('secretModal').style.display = 'none';
+            document.getElementById('modalBg').style.display = 'none';
+        }
+        function saveSecretData() {
+            localStorage.setItem('fixedSeats', document.getElementById('fixedSeats').value);
+            localStorage.setItem('separated', document.getElementById('separated').value);
+            closeSecretMode();
+        }
+
+        // 자리 뽑기 3초 애니메이션 및 최종 배치
+        function startShuffle() {
+            if(isShuffling) return;
+            
+            let rawInput = document.getElementById('studentNames').value;
+            let students = rawInput.trim().split(/[\s,]+/).filter(n => n.length > 0);
+            
+            const rows = parseInt(document.getElementById('rows').value);
+            const cols = parseInt(document.getElementById('cols').value);
+            const totalSeats = rows * cols;
+
+            if(students.length > totalSeats) {
+                alert("학생 수가 책상 수보다 많습니다. 행/열을 늘려주세요.");
+                return;
+            }
+
+            isShuffling = true;
+            const allDesks = document.querySelectorAll('.name-tag');
+            
+            // 3초간 셔플 애니메이션 (0.1초마다 무작위 텍스트)
+            let shuffleInterval = setInterval(() => {
+                allDesks.forEach(desk => {
+                    let randomName = students[Math.floor(Math.random() * students.length)] || "-";
+                    desk.innerText = randomName;
+                });
+            }, 100);
+
+            // 3초 뒤 최종 결정
+            setTimeout(() => {
+                clearInterval(shuffleInterval);
+                let finalLayout = calculateLayout(students, totalSeats, rows, cols);
+                
+                allDesks.forEach((desk, idx) => {
+                    desk.innerText = finalLayout[idx] || "";
+                });
+                isShuffling = false;
+            }, 3000);
+        }
+
+        // 자리 계산 로직 (시크릿 모드 반영)
+        function calculateLayout(students, totalSeats, rows, cols) {
+            let layout = new Array(totalSeats).fill("");
+            let remainingStudents = [...students];
+
+            // 1. 지정석 처리
+            const fixedStr = document.getElementById('fixedSeats').value;
+            if(fixedStr) {
+                let fixedPairs = fixedStr.split(',').map(s => s.trim());
+                fixedPairs.forEach(pair => {
+                    let [seatNum, name] = pair.split(':');
+                    let idx = parseInt(seatNum) - 1;
+                    if(idx >= 0 && idx < totalSeats && remainingStudents.includes(name)) {
+                        layout[idx] = name;
+                        remainingStudents = remainingStudents.filter(n => n !== name);
+                    }
+                });
+            }
+
+            // 2. 남은 자리 무작위 배치 (따로 앉기 규칙 적용하여 최대 100번 시도)
+            const sepStr = document.getElementById('separated').value;
+            let sepPairs = sepStr ? sepStr.split(',').map(s => s.split('-').map(n=>n.trim())) : [];
+
+            let bestLayout = null;
+            
+            for(let attempt = 0; attempt < 100; attempt++) {
+                let tempLayout = [...layout];
+                let tempStudents = [...remainingStudents].sort(() => Math.random() - 0.5);
+                
+                // 빈 자리에 학생 채우기
+                for(let i=0; i<totalSeats; i++) {
+                    if(!tempLayout[i] && tempStudents.length > 0) {
+                        tempLayout[i] = tempStudents.pop();
+                    }
+                }
+
+                // 따로 앉기 규칙 검사
+                let isValid = true;
+                for(let pair of sepPairs) {
+                    let idx1 = tempLayout.indexOf(pair[0]);
+                    let idx2 = tempLayout.indexOf(pair[1]);
+                    
+                    if(idx1 !== -1 && idx2 !== -1) {
+                        let r1 = Math.floor(idx1 / cols), c1 = idx1 % cols;
+                        let r2 = Math.floor(idx2 / cols), c2 = idx2 % cols;
+                        // 상하좌우 인접해있다면 실패
+                        if((Math.abs(r1-r2) === 1 && c1 === c2) || (Math.abs(c1-c2) === 1 && r1 === r2)) {
+                            isValid = false;
+                            break;
+                        }
+                    }
+                }
+
+                if(isValid) {
+                    bestLayout = tempLayout;
+                    break;
+                }
+                // 만약 규칙에 실패해도 마지막 시도면 그냥 적용 (무한루프 방지)
+                if(attempt === 99) bestLayout = tempLayout;
+            }
+
+            return bestLayout;
+        }
+
+        // HWP(HTML Table) 다운로드 기능
+        function downloadHWP() {
+            const rows = parseInt(document.getElementById('rows').value);
+            const cols = parseInt(document.getElementById('cols').value);
+            const desks = document.querySelectorAll('.name-tag');
+            
+            let tableHTML = `<table border="1" style="width:100%; text-align:center; border-collapse:collapse; font-size:16px;">`;
+            tableHTML += `<tr><td colspan="${cols}" style="background-color:#ccc; padding:10px; font-weight:bold;">칠 판</td></tr>`;
+            
+            for(let r=0; r<rows; r++) {
+                tableHTML += `<tr>`;
+                for(let c=0; c<cols; c++) {
+                    let idx = r * cols + c;
+                    let name = desks[idx] ? desks[idx].innerText : "";
+                    tableHTML += `<td style="padding:15px; height:50px;">${name}</td>`;
+                }
+                tableHTML += `</tr>`;
+            }
+            tableHTML += `</table>`;
+
+            // 한글 등 워드프로세서가 표로 인식할 수 있도록 인코딩하여 다운로드
+            const blob = new Blob(['<meta charset="utf-8">' + tableHTML], {type: 'application/vnd.ms-word'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '자리배치표.html'; // .html로 받아 한글에서 열면 표가 유지됩니다.
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
